@@ -237,20 +237,26 @@ canvas {
         display: none;
     }
 
-    /* Move arrows closer to edges on mobile */
+    /* Move arrows to edges on mobile */
     #arrow-prev {
-        left: 5px;
+        left: 2px;
     }
 
     #arrow-next {
-        right: 5px;
+        right: 2px;
     }
 
-    /* Make nav arrows smaller on mobile */
+    /* Nav arrows: no background, just icon */
     .nav-arrow {
-        width: 36px;
-        height: 36px;
-        font-size: 1.4rem;
+        background: transparent !important;
+        box-shadow: none !important;
+        width: 30px;
+        height: 30px;
+        font-size: 1.6rem;
+    }
+
+    .nav-arrow:hover {
+        background: transparent !important;
     }
 
     /* Toolbar adjustments for smaller screens */

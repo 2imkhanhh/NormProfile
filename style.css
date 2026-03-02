@@ -6,11 +6,13 @@ body {
     align-items: center;
     height: 100vh;
     font-family: sans-serif;
-    overflow: hidden;
+    overflow-x: hidden;
+    overscroll-behavior: none;
 }
 
 #zoom-wrapper {
     transition: transform 0.3s ease;
+    transform-origin: center center;
 }
 
 #canvas-container {
@@ -29,26 +31,6 @@ canvas {
     width: 100%;
     height: 100%;
 }
-
-/* .page::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 40px;
-    pointer-events: none;
-    z-index: 10;
-}
-
-.page:nth-child(even)::after {
-    right: 0;
-    background: linear-gradient(to left, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0) 100%);
-}
-
-.page:nth-child(odd)::after {
-    left: 0;
-    background: linear-gradient(to right, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0) 100%);
-} */
 
 #loading {
     position: fixed;
@@ -279,9 +261,7 @@ canvas {
 
     #canvas-container {
         transform: translateX(0) !important; 
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        /* XÓA QUY TẮC: display: flex; và các nội dung căn chỉnh ở đây để không phá vỡ thư viện gốc */
     }
     
     .page {

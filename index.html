@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <title>PDF Flipbook - Profile Công Ty</title>
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <div id="start-screen">
+    <h1>Profile của Norm nèeeee</h1>
+    <button id="btn-start">
+      <img src="logo.png" alt="Logo" style="width: 36px; height: auto; object-fit: contain;">
+      Mở xem Profile
+    </button>
+  </div>
+
+  <div id="loading">Chờ xíu nhaa^^...</div>
+
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <strong>Mục lục trang</strong>
+      <button id="close-sidebar"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div id="thumbnail-container"></div>
+  </div>
+
+  <button id="arrow-prev" class="nav-arrow"><span class="material-symbols-outlined">chevron_left</span></button>
+  <button id="arrow-next" class="nav-arrow"><span class="material-symbols-outlined">chevron_right</span></button>
+
+  <div id="zoom-wrapper">
+    <div id="canvas-container"></div>
+  </div>
+
+  <div id="toolbar">
+    <button id="tb-prev"><span class="material-symbols-outlined">chevron_left</span></button>
+    <div class="page-info">
+      <input type="text" id="page-input" value="1"> / <span id="total-pages">0</span>
+    </div>
+    <button id="tb-next"><span class="material-symbols-outlined">chevron_right</span></button>
+
+    <div class="divider"></div>
+
+    <button id="btn-sound" title="Bật/Tắt âm thanh"><span class="material-symbols-outlined"
+        id="sound-icon">volume_up</span></button>
+
+    <button id="btn-thumbs" title="Xem danh sách trang"><span
+        class="material-symbols-outlined">grid_view</span></button>
+    <button id="btn-zoom-in" title="Phóng to"><span class="material-symbols-outlined">zoom_in</span></button>
+    <button id="btn-zoom-out" title="Thu nhỏ"><span class="material-symbols-outlined">zoom_out</span></button>
+    <button id="btn-fullscreen" title="Toàn màn hình"><span class="material-symbols-outlined">fullscreen</span></button>
+
+    <button id="btn-download" title="Tải xuống PDF"><span class="material-symbols-outlined">download</span></button>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/page-flip/dist/js/page-flip.browser.min.js"></script>
+
+  <script>
+    const pdfUrl = 'Profile.pdf';
+    const container = document.getElementById('canvas-container');
+    const thumbContainer = document.getElementById('thumbnail-container');
+    let pageFlipObj;
+
+    const flipSound = new Audio('10-diem.mp3');
+    flipSound.preload = 'auto';
+    let isSoundEnabled = true;
+
+    const loadingSound = new Audio('tap-trung-vao-su-nghiep.mp3'); 
+    loadingSound.loop = true; 
+    loadingSound.volume = 0.5; 
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+    async function initFlipbook() {
+      try {
+        const pdf = await pdfjsLib.getDocument(pdfUrl).promise;
+        const numPages = pdf.numPages;
+        document.getElementById('total-pages').innerText = numPages;
+
+        for (let i = 1; i <= numPages; i++) {
+          const page = await pdf.getPage(i);
+          const viewport = page.getViewport({ scale: 1.5 });
+
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+
+          const pageDiv = document.createElement('div');
+          pageDiv.className = 'page';
+          pageDiv.appendChild(canvas);
+          container.appendChild(pageDiv);
+
+          await page.render({ canvasContext: context, viewport: viewport }).promise;
+
+          const thumbImg = document.createElement('img');
+          thumbImg.src = canvas.toDataURL('image/jpeg', 0.5);
+          const thumbDiv = document.createElement('div');
+          thumbDiv.className = 'thumb-item';
+          thumbDiv.innerHTML = `<span>Trang ${i}</span>`;
+          thumbDiv.prepend(thumbImg);
+
+          thumbDiv.onclick = () => {
+            pageFlipObj.turnToPage(i - 1);
+            document.getElementById('sidebar').classList.remove('active');
+          };
+          thumbContainer.appendChild(thumbDiv);
+        }
+
+        document.getElementById('loading').style.display = 'none';
+        loadingSound.pause();
+        loadingSound.currentTime = 0; 
+        container.style.visibility = 'visible';
+
+        pageFlipObj = new St.PageFlip(container, {
+          width: 450,
+          height: 636,
+          size: "fixed",
+          showCover: true,
+          usePortrait: false,
+          maxShadowOpacity: 0.5
+        });
+
+        pageFlipObj.loadFromHTML(document.querySelectorAll('.page'));
+        container.style.transform = 'translateX(-25%)';
+
+        pageFlipObj.on('changeState', (e) => {
+          if (e.data === 'flipping' && isSoundEnabled) {
+            flipSound.currentTime = 0;
+            flipSound.play().catch(error => console.log("Chưa tương tác", error));
+          }
+        });
+
+        pageFlipObj.on('flip', (e) => {
+          let currentPage = e.data;
+          document.getElementById('page-input').value = currentPage + 1;
+
+          if (currentPage === 0) {
+            container.style.transform = 'translateX(-25%)';
+          } else if (currentPage === pageFlipObj.getPageCount() - 1 && pageFlipObj.getPageCount() % 2 === 0) {
+            container.style.transform = 'translateX(25%)';
+          } else {
+            container.style.transform = 'translateX(0)';
+          }
+        });
+
+      } catch (error) {
+        console.error("Lỗi: ", error);
+        document.getElementById('loading').innerText = "Không thể tải PDF!";
+        loadingSound.pause();
+      }
+    }
+
+    document.getElementById('btn-start').onclick = () => {
+      document.getElementById('start-screen').style.display = 'none';
+      document.getElementById('loading').style.display = 'block';
+
+      if (isSoundEnabled) {
+        loadingSound.play();
+      }
+
+      initFlipbook();
+    };
+
+    document.getElementById('arrow-prev').onclick = () => pageFlipObj.flipPrev();
+    document.getElementById('arrow-next').onclick = () => pageFlipObj.flipNext();
+    document.getElementById('tb-prev').onclick = () => pageFlipObj.flipPrev();
+    document.getElementById('tb-next').onclick = () => pageFlipObj.flipNext();
+
+    document.getElementById('page-input').addEventListener('change', (e) => {
+      let pageNum = parseInt(e.target.value) - 1;
+      if (pageNum >= 0 && pageNum < pageFlipObj.getPageCount()) {
+        pageFlipObj.turnToPage(pageNum);
+      }
+    });
+
+    document.getElementById('btn-thumbs').onclick = () => document.getElementById('sidebar').classList.add('active');
+    document.getElementById('close-sidebar').onclick = () => document.getElementById('sidebar').classList.remove('active');
+
+    let currentZoom = 1;
+    document.getElementById('btn-zoom-in').onclick = () => {
+      currentZoom += 0.2;
+      document.getElementById('zoom-wrapper').style.transform = `scale(${currentZoom})`;
+    };
+    document.getElementById('btn-zoom-out').onclick = () => {
+      currentZoom = Math.max(0.5, currentZoom - 0.2);
+      document.getElementById('zoom-wrapper').style.transform = `scale(${currentZoom})`;
+    };
+
+    document.getElementById('btn-fullscreen').onclick = () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+    };
+
+    const btnSound = document.getElementById('btn-sound');
+    const soundIcon = document.getElementById('sound-icon');
+    btnSound.onclick = () => {
+      isSoundEnabled = !isSoundEnabled;
+      if (isSoundEnabled) {
+        soundIcon.innerText = 'volume_up';
+      } else {
+        soundIcon.innerText = 'volume_off';
+      }
+    };
+
+    document.getElementById('btn-download').onclick = () => {
+      const a = document.createElement('a');
+      a.href = pdfUrl;
+      a.download = 'Profile.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    };
+  </script>
+</body>
+
+</html>

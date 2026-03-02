@@ -93,11 +93,14 @@
 
         let pageWidth, pageHeight, renderScale;
 
+        const dpr = window.devicePixelRatio || 1;
+
         if (isMobile) {
-          // Mobile: 1 trang full màn hình, trừ toolbar và arrows
-          pageWidth = Math.floor(window.innerWidth * 0.92); // chừa chỗ cho 2 mũi tên
+          // Mobile: 1 trang full màn hình, trừ chỗ cho arrows
+          pageWidth = Math.floor(window.innerWidth * 0.92);
           pageHeight = Math.floor(pageWidth * pageAspect);
-          renderScale = pageWidth / baseViewport.width;
+          // Nhân dpr để render độ phân giải cao → chữ sắc nét
+          renderScale = (pageWidth / baseViewport.width) * dpr;
         } else {
           pageWidth = 450;
           pageHeight = 636;
@@ -110,6 +113,7 @@
 
           const canvas = document.createElement('canvas');
           const context = canvas.getContext('2d');
+          // Canvas pixel thực tế = kích thước cao * dpr
           canvas.height = viewport.height;
           canvas.width = viewport.width;
 
@@ -118,6 +122,9 @@
           if (isMobile) {
             pageDiv.style.width = pageWidth + 'px';
             pageDiv.style.height = pageHeight + 'px';
+            // CSS size hiển thị đúng kích thước thực (không nhân dpr)
+            canvas.style.width = pageWidth + 'px';
+            canvas.style.height = pageHeight + 'px';
           }
           pageDiv.appendChild(canvas);
           container.appendChild(pageDiv);

@@ -162,6 +162,7 @@
           if (isMobile) {
             pageDiv.style.width = pageWidth + 'px';
             pageDiv.style.height = pageHeight + 'px';
+            // CSS size hiển thị đúng kích thước thực (không nhân dpr)
             canvas.style.width = pageWidth + 'px';
             canvas.style.height = pageHeight + 'px';
           }
@@ -198,15 +199,49 @@
           height: pageHeight,
           size: "fixed",
           showCover: true,
-          usePortrait: isMobile,      // true = 1 trang, false = 2 trang
+          usePortrait: isMobile,
           mobileScrollSupport: false,
-          maxShadowOpacity: 0.5
+          maxShadowOpacity: 0.5,
+          // Đồng bộ hiệu ứng lật 2 chiều trên mobile
+          swipeDistance: isMobile ? 10 : 30,
+          clickEventForward: false,
         });
 
         pageFlipObj.loadFromHTML(document.querySelectorAll('.page'));
 
+        // Desktop: offset để canh giữa khi hiển thị 2 trang
         if (!isMobile) {
           container.style.transform = 'translateX(-25%)';
+        }
+
+        // Mobile: override touch để 2 chiều lật dùng cùng 1 kiểu hiệu ứng
+        if (isMobile) {
+          let touchStartX = 0;
+          let touchStartY = 0;
+          let isSwiping = false;
+
+          container.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            isSwiping = false;
+          }, { passive: true });
+
+          container.addEventListener('touchmove', (e) => {
+            const dx = Math.abs(e.touches[0].clientX - touchStartX);
+            const dy = Math.abs(e.touches[0].clientY - touchStartY);
+            if (dx > dy && dx > 10) isSwiping = true;
+          }, { passive: true });
+
+          container.addEventListener('touchend', (e) => {
+            if (!isSwiping) return;
+            const dx = e.changedTouches[0].clientX - touchStartX;
+            if (Math.abs(dx) < 40) return;
+            if (dx < 0) {
+              pageFlipObj.flipNext('bottom');
+            } else {
+              pageFlipObj.flipPrev('bottom');
+            }
+          }, { passive: true });
         }
 
         pageFlipObj.on('changeState', (e) => {

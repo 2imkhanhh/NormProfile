@@ -248,3 +248,43 @@ canvas {
 #loading {
     display: none;
 }
+
+@media (max-width: 768px) {
+    .nav-arrow {
+        display: none !important; 
+    }
+
+    #start-screen h1 {
+        font-size: 24px;
+        text-align: center;
+        padding: 0 15px;
+    }
+
+    #btn-zoom-in,
+    #btn-zoom-out,
+    #btn-fullscreen,
+    .divider {
+        display: none;
+    }
+
+    #toolbar {
+        padding: 5px 10px;
+        gap: 5px;
+        bottom: 10px;
+    }
+
+    #toolbar .material-symbols-outlined {
+        font-size: 18px;
+    }
+
+    #canvas-container {
+        transform: translateX(0) !important; 
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .page {
+        box-shadow: 0 0 10px rgba(0,0,0,0.5); 
+    }
+}

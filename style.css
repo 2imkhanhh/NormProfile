@@ -29,7 +29,6 @@ canvas {
     height: 100%;
 }
 
-
 .nav-arrow {
     position: fixed;
     top: 50%;
@@ -218,18 +217,52 @@ canvas {
     transform: scale(1.05);
 }
 
+/* ===== MOBILE VIEWER (custom flip engine) ===== */
+#mobile-viewer {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+}
+
+#mobile-page-container {
+    perspective: 1200px;
+    position: relative;
+}
+
+#mobile-page-inner {
+    position: relative;
+    transform-style: preserve-3d;
+    will-change: transform;
+}
+
+#mobile-canvas-front,
+#mobile-canvas-back {
+    position: absolute;
+    top: 0;
+    left: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    display: block;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+    border-radius: 2px;
+}
+
+#mobile-canvas-back {
+    transform: rotateY(180deg);
+}
 
 /* ===== MOBILE STYLES ===== */
 @media (max-width: 768px) {
 
-    /* Hide zoom buttons on mobile (not very useful) */
     #btn-zoom-in,
     #btn-zoom-out,
     #btn-fullscreen {
         display: none;
     }
 
-    /* Move arrows to edges on mobile */
     #arrow-prev {
         left: 2px;
     }
@@ -238,7 +271,6 @@ canvas {
         right: 2px;
     }
 
-    /* Nav arrows: no background, just icon */
     .nav-arrow {
         background: transparent !important;
         box-shadow: none !important;
@@ -251,18 +283,30 @@ canvas {
         background: transparent !important;
     }
 
-    /* Toolbar adjustments for smaller screens */
     #toolbar {
         gap: 6px;
         padding: 4px 10px;
         bottom: 10px;
     }
 
-    /* Center the book on mobile */
-    #zoom-wrapper {
-        display: flex;
+    /* Start screen */
+    #start-screen {
+        background:
+            linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),
+            url('norm-background.png') center/contain no-repeat;
+        background-color: #222;
         justify-content: center;
-        align-items: center;
+    }
+
+    #start-screen h1 {
+        font-size: 20px;
+        text-align: center;
+        padding: 0 20px;
+    }
+
+    #btn-start {
+        font-size: 16px;
+        padding: 12px 30px;
     }
 }
 
@@ -471,28 +515,5 @@ canvas {
     to {
         stroke-dashoffset: 439.82;
         transform: translate(100px, 100px) rotate(112deg);
-    }
-}
-
-/* ===== MOBILE: Start screen background nhỏ lại ===== */
-@media (max-width: 768px) {
-    #start-screen {
-        background:
-            linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),
-            url('norm-background.png') center/contain no-repeat;
-        background-color: #222;
-        justify-content: flex-end;
-        padding-bottom: 60px;
-    }
-
-    #start-screen h1 {
-        font-size: 20px;
-        text-align: center;
-        padding: 0 20px;
-    }
-
-    #btn-start {
-        font-size: 16px;
-        padding: 12px 30px;
     }
 }

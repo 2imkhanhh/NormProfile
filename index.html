@@ -29,10 +29,8 @@
     <div id="thumbnail-container"></div>
   </div>
 
-  <button id="arrow-prev" class="nav-arrow" style="display: none;"><span
-      class="material-symbols-outlined">chevron_left</span></button>
-  <button id="arrow-next" class="nav-arrow" style="display: none;"><span
-      class="material-symbols-outlined">chevron_right</span></button>
+  <button id="arrow-prev" class="nav-arrow" style="display: none;"><span class="material-symbols-outlined">chevron_left</span></button>
+  <button id="arrow-next" class="nav-arrow" style="display: none;"><span class="material-symbols-outlined">chevron_right</span></button>
 
   <div id="zoom-wrapper">
     <div id="canvas-container"></div>
@@ -72,9 +70,9 @@
     flipSound.preload = 'auto';
     let isSoundEnabled = true;
 
-    const loadingSound = new Audio('trinh-la-gi.mp3');
-    loadingSound.loop = true;
-    loadingSound.volume = 0.5;
+    const loadingSound = new Audio('trinh-la-gi.mp3'); 
+    loadingSound.loop = true; 
+    loadingSound.volume = 0.5; 
 
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
@@ -116,49 +114,24 @@
 
         document.getElementById('loading').style.display = 'none';
         loadingSound.pause();
-        loadingSound.currentTime = 0;
+        loadingSound.currentTime = 0; 
         container.style.visibility = 'visible';
 
         document.getElementById('toolbar').style.display = 'flex';
         document.getElementById('arrow-prev').style.display = 'flex';
         document.getElementById('arrow-next').style.display = 'flex';
 
-        const screenWidth = window.innerWidth;
-        const isMobile = window.innerWidth < 768;
-
-        let bookWidth = isMobile ? screenWidth * 0.98 : 450;
-        let bookHeight = bookWidth * 1.414;
-
-        // BẮT BUỘC: Giới hạn chiều rộng của wrapper trên mobile bằng đúng màn hình
-        // Để thư viện PageFlip tự hiểu là không đủ chỗ cho 2 trang và ép về 1 trang.
-        const zoomWrapper = document.getElementById('zoom-wrapper');
-        if (isMobile) {
-          zoomWrapper.style.width = '100vw';
-          zoomWrapper.style.overflow = 'hidden';
-          zoomWrapper.style.display = 'flex';
-          zoomWrapper.style.justifyContent = 'center';
-          zoomWrapper.style.alignItems = 'center';
-          zoomWrapper.style.height = '100vh';
-        }
-
         pageFlipObj = new St.PageFlip(container, {
-          width: bookWidth,
-          height: bookHeight,
+          width: 450,
+          height: 636,
           size: "fixed",
-          usePortrait: true, // Kích hoạt 1 trang tự động
-          showCover: !isMobile, // Hiển thị bìa độc lập trên Desktop, Mobile thì bỏ qua
-          maxShadowOpacity: 0.5,
-          mobileScrollSupport: true
+          showCover: true,
+          usePortrait: false,
+          maxShadowOpacity: 0.5
         });
 
         pageFlipObj.loadFromHTML(document.querySelectorAll('.page'));
-
-        // Dịch chuyển sách để căn giữa khi mở bìa (Chỉ áp dụng trên PC)
-        if (!isMobile) {
-          container.style.transform = 'translateX(-25%)';
-        } else {
-          container.style.transform = 'translateX(0)';
-        }
+        container.style.transform = 'translateX(-25%)';
 
         pageFlipObj.on('changeState', (e) => {
           if (e.data === 'flipping' && isSoundEnabled) {
@@ -171,14 +144,10 @@
           let currentPage = e.data;
           document.getElementById('page-input').value = currentPage + 1;
 
-          if (!isMobile) {
-            if (currentPage === 0) {
-              container.style.transform = 'translateX(-25%)';
-            } else if (currentPage === pageFlipObj.getPageCount() - 1 && pageFlipObj.getPageCount() % 2 === 0) {
-              container.style.transform = 'translateX(25%)';
-            } else {
-              container.style.transform = 'translateX(0)';
-            }
+          if (currentPage === 0) {
+            container.style.transform = 'translateX(-25%)';
+          } else if (currentPage === pageFlipObj.getPageCount() - 1 && pageFlipObj.getPageCount() % 2 === 0) {
+            container.style.transform = 'translateX(25%)';
           } else {
             container.style.transform = 'translateX(0)';
           }
@@ -219,15 +188,12 @@
 
     let currentZoom = 1;
     document.getElementById('btn-zoom-in').onclick = () => {
-      if (isMobile) return;
       currentZoom += 0.2;
-      zoomWrapper.style.transform = `scale(${currentZoom})`;
+      document.getElementById('zoom-wrapper').style.transform = `scale(${currentZoom})`;
     };
-
     document.getElementById('btn-zoom-out').onclick = () => {
-      if (isMobile) return;
       currentZoom = Math.max(0.5, currentZoom - 0.2);
-      zoomWrapper.style.transform = `scale(${currentZoom})`;
+      document.getElementById('zoom-wrapper').style.transform = `scale(${currentZoom})`;
     };
 
     document.getElementById('btn-fullscreen').onclick = () => {

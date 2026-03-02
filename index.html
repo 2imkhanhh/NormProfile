@@ -3,6 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nôrm Creative</title>
   <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
@@ -76,15 +77,36 @@
 
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
+    // Detect mobile
+    const isMobile = window.innerWidth <= 768;
+
     async function initFlipbook() {
       try {
         const pdf = await pdfjsLib.getDocument(pdfUrl).promise;
         const numPages = pdf.numPages;
         document.getElementById('total-pages').innerText = numPages;
 
+        // Tính kích thước trang
+        const firstPage = await pdf.getPage(1);
+        const baseViewport = firstPage.getViewport({ scale: 1 });
+        const pageAspect = baseViewport.height / baseViewport.width; // height/width ratio
+
+        let pageWidth, pageHeight, renderScale;
+
+        if (isMobile) {
+          // Mobile: 1 trang full màn hình, trừ toolbar và arrows
+          pageWidth = Math.floor(window.innerWidth * 0.82); // chừa chỗ cho 2 mũi tên
+          pageHeight = Math.floor(pageWidth * pageAspect);
+          renderScale = pageWidth / baseViewport.width;
+        } else {
+          pageWidth = 450;
+          pageHeight = 636;
+          renderScale = 1.5;
+        }
+
         for (let i = 1; i <= numPages; i++) {
           const page = await pdf.getPage(i);
-          const viewport = page.getViewport({ scale: 1.5 });
+          const viewport = page.getViewport({ scale: renderScale });
 
           const canvas = document.createElement('canvas');
           const context = canvas.getContext('2d');
@@ -93,6 +115,10 @@
 
           const pageDiv = document.createElement('div');
           pageDiv.className = 'page';
+          if (isMobile) {
+            pageDiv.style.width = pageWidth + 'px';
+            pageDiv.style.height = pageHeight + 'px';
+          }
           pageDiv.appendChild(canvas);
           container.appendChild(pageDiv);
 
@@ -122,16 +148,21 @@
         document.getElementById('arrow-next').style.display = 'flex';
 
         pageFlipObj = new St.PageFlip(container, {
-          width: 450,
-          height: 636,
+          width: pageWidth,
+          height: pageHeight,
           size: "fixed",
           showCover: true,
-          usePortrait: false,
+          usePortrait: isMobile,      // true = 1 trang, false = 2 trang
+          mobileScrollSupport: false,
           maxShadowOpacity: 0.5
         });
 
         pageFlipObj.loadFromHTML(document.querySelectorAll('.page'));
-        container.style.transform = 'translateX(-25%)';
+
+        // Desktop: offset để canh giữa khi hiển thị 2 trang
+        if (!isMobile) {
+          container.style.transform = 'translateX(-25%)';
+        }
 
         pageFlipObj.on('changeState', (e) => {
           if (e.data === 'flipping' && isSoundEnabled) {
@@ -144,12 +175,14 @@
           let currentPage = e.data;
           document.getElementById('page-input').value = currentPage + 1;
 
-          if (currentPage === 0) {
-            container.style.transform = 'translateX(-25%)';
-          } else if (currentPage === pageFlipObj.getPageCount() - 1 && pageFlipObj.getPageCount() % 2 === 0) {
-            container.style.transform = 'translateX(25%)';
-          } else {
-            container.style.transform = 'translateX(0)';
+          if (!isMobile) {
+            if (currentPage === 0) {
+              container.style.transform = 'translateX(-25%)';
+            } else if (currentPage === pageFlipObj.getPageCount() - 1 && pageFlipObj.getPageCount() % 2 === 0) {
+              container.style.transform = 'translateX(25%)';
+            } else {
+              container.style.transform = 'translateX(0)';
+            }
           }
         });
 

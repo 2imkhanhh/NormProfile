@@ -20,8 +20,8 @@
     </button>
   </div>
 
-  <div id="loading">
-    <svg xmlns="http://www.w3.org/2000/svg" height="200px" width="200px" viewBox="0 0 200 200" class="pencil">
+  <div id="loading"><svg xmlns="http://www.w3.org/2000/svg" height="200px" width="200px" viewBox="0 0 200 200"
+      class="pencil">
       <defs>
         <clipPath id="pencil-eraser">
           <rect height="30" width="30" ry="5" rx="5"></rect>
@@ -73,16 +73,6 @@
   <button id="arrow-next" class="nav-arrow" style="display: none;"><span
       class="material-symbols-outlined">chevron_right</span></button>
 
-  <!-- Mobile viewer: dùng riêng, không dùng PageFlip -->
-  <div id="mobile-viewer" style="display:none;">
-    <div id="mobile-page-container">
-      <div id="mobile-page-inner">
-        <canvas id="mobile-canvas-front"></canvas>
-        <canvas id="mobile-canvas-back"></canvas>
-      </div>
-    </div>
-  </div>
-
   <div id="zoom-wrapper">
     <div id="canvas-container"></div>
   </div>
@@ -127,247 +117,154 @@
 
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
+    // Detect mobile
     const isMobile = window.innerWidth <= 768;
 
-    // =========================================================
-    // MOBILE: Tự làm flip animation đồng bộ, không dùng PageFlip
-    // =========================================================
-    let mobilePages = [];       // mảng ImageBitmap hoặc canvas dataURL
-    let mobileCurrentPage = 0;
-    let mobileIsFlipping = false;
-    let mobilePdf = null;
-    let mobilePageWidth, mobilePageHeight, mobileRenderScale;
-
-    async function mobileRenderPageToCanvas(pageNum, canvas) {
-      const page = await mobilePdf.getPage(pageNum);
-      const viewport = page.getViewport({ scale: mobileRenderScale });
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    }
-
-    async function mobileGoTo(targetPage, direction) {
-      if (mobileIsFlipping) return;
-      if (targetPage < 0 || targetPage >= mobilePages.length) return;
-      if (targetPage === mobileCurrentPage) return;
-
-      mobileIsFlipping = true;
-      if (isSoundEnabled) {
-        flipSound.currentTime = 0;
-        flipSound.play().catch(() => { });
-      }
-
-      const inner = document.getElementById('mobile-page-inner');
-      const front = document.getElementById('mobile-canvas-front');
-      const back = document.getElementById('mobile-canvas-back');
-
-      // Vẽ trang hiện tại lên front, trang đích lên back
-      const ctx1 = front.getContext('2d');
-      const ctx2 = back.getContext('2d');
-
-      front.width = mobilePageWidth;
-      front.height = mobilePageHeight;
-      back.width = mobilePageWidth;
-      back.height = mobilePageHeight;
-
-      // Vẽ ảnh đã render sẵn
-      const imgFront = new Image();
-      const imgBack = new Image();
-
-      await new Promise(res => { imgFront.onload = res; imgFront.src = mobilePages[mobileCurrentPage]; });
-      await new Promise(res => { imgBack.onload = res; imgBack.src = mobilePages[targetPage]; });
-
-      ctx1.drawImage(imgFront, 0, 0, mobilePageWidth, mobilePageHeight);
-      ctx2.drawImage(imgBack, 0, 0, mobilePageWidth, mobilePageHeight);
-
-      // Flip: front quay ra, back quay vào — cùng 1 kiểu animation
-      inner.style.transition = 'none';
-      inner.style.transform = direction === 'next' ? 'rotateY(0deg)' : 'rotateY(0deg)';
-
-      // Set up: back bắt đầu ở vị trí ngược
-      back.style.transform = direction === 'next' ? 'rotateY(180deg)' : 'rotateY(-180deg)';
-      front.style.transform = 'rotateY(0deg)';
-
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          inner.style.transition = 'transform 0.5s ease-in-out';
-          inner.style.transform = direction === 'next' ? 'rotateY(-180deg)' : 'rotateY(180deg)';
-        });
-      });
-
-      setTimeout(() => {
-        mobileCurrentPage = targetPage;
-        document.getElementById('page-input').value = mobileCurrentPage + 1;
-
-        // Reset: hiện trang mới trên front, ẩn back
-        ctx1.drawImage(imgBack, 0, 0, mobilePageWidth, mobilePageHeight);
-        inner.style.transition = 'none';
-        inner.style.transform = 'rotateY(0deg)';
-        front.style.transform = 'rotateY(0deg)';
-        back.style.transform = 'rotateY(180deg)';
-
-        mobileIsFlipping = false;
-      }, 520);
-    }
-
-    function mobilePrev() { mobileGoTo(mobileCurrentPage - 1, 'prev'); }
-    function mobileNext() { mobileGoTo(mobileCurrentPage + 1, 'next'); }
-
-    // =========================================================
-    // INIT
-    // =========================================================
     async function initFlipbook() {
       try {
         const pdf = await pdfjsLib.getDocument(pdfUrl).promise;
         const numPages = pdf.numPages;
         document.getElementById('total-pages').innerText = numPages;
 
+        // Tính kích thước trang
         const firstPage = await pdf.getPage(1);
         const baseViewport = firstPage.getViewport({ scale: 1 });
-        const pageAspect = baseViewport.height / baseViewport.width;
+        const pageAspect = baseViewport.height / baseViewport.width; // height/width ratio
+
+        let pageWidth, pageHeight, renderScale;
+
         const dpr = window.devicePixelRatio || 1;
 
         if (isMobile) {
-          mobilePdf = pdf;
-          mobilePageWidth = Math.floor(window.innerWidth * 0.92);
-          mobilePageHeight = Math.floor(mobilePageWidth * pageAspect);
-          mobileRenderScale = (mobilePageWidth / baseViewport.width) * dpr;
-
-          // Render trước tất cả trang thành dataURL để flip nhanh
-          for (let i = 1; i <= numPages; i++) {
-            const offscreen = document.createElement('canvas');
-            offscreen.width = Math.round(baseViewport.width * mobileRenderScale);
-            offscreen.height = Math.round(baseViewport.height * mobileRenderScale);
-            const page = await pdf.getPage(i);
-            const vp = page.getViewport({ scale: mobileRenderScale });
-            offscreen.width = vp.width;
-            offscreen.height = vp.height;
-            await page.render({ canvasContext: offscreen.getContext('2d'), viewport: vp }).promise;
-
-            // Thumbnail
-            const thumbImg = document.createElement('img');
-            thumbImg.src = offscreen.toDataURL('image/jpeg', 0.5);
-            const thumbDiv = document.createElement('div');
-            thumbDiv.className = 'thumb-item';
-            thumbDiv.innerHTML = `<span>Trang ${i}</span>`;
-            thumbDiv.prepend(thumbImg);
-            const pageIndex = i - 1;
-            thumbDiv.onclick = () => {
-              mobileGoTo(pageIndex, pageIndex > mobileCurrentPage ? 'next' : 'prev');
-              document.getElementById('sidebar').classList.remove('active');
-            };
-            thumbContainer.appendChild(thumbDiv);
-
-            mobilePages.push(offscreen.toDataURL('image/jpeg', 0.95));
-          }
-
-          // Setup mobile viewer
-          document.getElementById('mobile-viewer').style.display = 'flex';
-          const front = document.getElementById('mobile-canvas-front');
-          const back = document.getElementById('mobile-canvas-back');
-          const inner = document.getElementById('mobile-page-inner');
-
-          front.style.width = mobilePageWidth + 'px';
-          front.style.height = mobilePageHeight + 'px';
-          back.style.width = mobilePageWidth + 'px';
-          back.style.height = mobilePageHeight + 'px';
-          inner.style.width = mobilePageWidth + 'px';
-          inner.style.height = mobilePageHeight + 'px';
-          document.getElementById('mobile-page-container').style.width = mobilePageWidth + 'px';
-          document.getElementById('mobile-page-container').style.height = mobilePageHeight + 'px';
-
-          // Vẽ trang đầu tiên
-          front.width = mobilePageWidth; front.height = mobilePageHeight;
-          back.width = mobilePageWidth; back.height = mobilePageHeight;
-          back.style.transform = 'rotateY(180deg)';
-
-          const imgFirst = new Image();
-          await new Promise(res => { imgFirst.onload = res; imgFirst.src = mobilePages[0]; });
-          front.getContext('2d').drawImage(imgFirst, 0, 0, mobilePageWidth, mobilePageHeight);
-
-          // Touch swipe
-          let touchStartX = 0, touchStartY = 0, isSwiping = false;
-          const viewer = document.getElementById('mobile-viewer');
-          viewer.addEventListener('touchstart', e => {
-            touchStartX = e.touches[0].clientX;
-            touchStartY = e.touches[0].clientY;
-            isSwiping = false;
-          }, { passive: true });
-          viewer.addEventListener('touchmove', e => {
-            const dx = Math.abs(e.touches[0].clientX - touchStartX);
-            const dy = Math.abs(e.touches[0].clientY - touchStartY);
-            if (dx > dy && dx > 10) isSwiping = true;
-          }, { passive: true });
-          viewer.addEventListener('touchend', e => {
-            if (!isSwiping) return;
-            const dx = e.changedTouches[0].clientX - touchStartX;
-            if (Math.abs(dx) < 40) return;
-            if (dx < 0) mobileNext(); else mobilePrev();
-          }, { passive: true });
-
+          // Mobile: 1 trang full màn hình, trừ chỗ cho arrows
+          pageWidth = Math.floor(window.innerWidth * 0.92);
+          pageHeight = Math.floor(pageWidth * pageAspect);
+          // Nhân dpr để render độ phân giải cao → chữ sắc nét
+          renderScale = (pageWidth / baseViewport.width) * dpr;
         } else {
-          // DESKTOP: dùng PageFlip như cũ
-          const pageWidth = 450, pageHeight = 636, renderScale = 1.5;
+          pageWidth = 450;
+          pageHeight = 636;
+          renderScale = 1.5;
+        }
 
-          for (let i = 1; i <= numPages; i++) {
-            const page = await pdf.getPage(i);
-            const viewport = page.getViewport({ scale: renderScale });
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
-            const pageDiv = document.createElement('div');
-            pageDiv.className = 'page';
-            pageDiv.appendChild(canvas);
-            container.appendChild(pageDiv);
-            await page.render({ canvasContext: context, viewport: viewport }).promise;
+        for (let i = 1; i <= numPages; i++) {
+          const page = await pdf.getPage(i);
+          const viewport = page.getViewport({ scale: renderScale });
 
-            const thumbImg = document.createElement('img');
-            thumbImg.src = canvas.toDataURL('image/jpeg', 0.5);
-            const thumbDiv = document.createElement('div');
-            thumbDiv.className = 'thumb-item';
-            thumbDiv.innerHTML = `<span>Trang ${i}</span>`;
-            thumbDiv.prepend(thumbImg);
-            thumbDiv.onclick = () => {
-              pageFlipObj.turnToPage(i - 1);
-              document.getElementById('sidebar').classList.remove('active');
-            };
-            thumbContainer.appendChild(thumbDiv);
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          // Canvas pixel thực tế = kích thước cao * dpr
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+
+          const pageDiv = document.createElement('div');
+          pageDiv.className = 'page';
+          if (isMobile) {
+            pageDiv.style.width = pageWidth + 'px';
+            pageDiv.style.height = pageHeight + 'px';
+            // CSS size hiển thị đúng kích thước thực (không nhân dpr)
+            canvas.style.width = pageWidth + 'px';
+            canvas.style.height = pageHeight + 'px';
           }
+          pageDiv.appendChild(canvas);
+          container.appendChild(pageDiv);
 
-          pageFlipObj = new St.PageFlip(container, {
-            width: pageWidth, height: pageHeight,
-            size: "fixed", showCover: true,
-            usePortrait: false,
-            mobileScrollSupport: false,
-            maxShadowOpacity: 0.5,
-          });
-          pageFlipObj.loadFromHTML(document.querySelectorAll('.page'));
-          container.style.transform = 'translateX(-25%)';
+          await page.render({ canvasContext: context, viewport: viewport }).promise;
 
-          pageFlipObj.on('changeState', (e) => {
-            if (e.data === 'flipping' && isSoundEnabled) {
-              flipSound.currentTime = 0;
-              flipSound.play().catch(() => { });
-            }
-          });
-          pageFlipObj.on('flip', (e) => {
-            let cp = e.data;
-            document.getElementById('page-input').value = cp + 1;
-            if (cp === 0) container.style.transform = 'translateX(-25%)';
-            else if (cp === pageFlipObj.getPageCount() - 1 && pageFlipObj.getPageCount() % 2 === 0) container.style.transform = 'translateX(25%)';
-            else container.style.transform = 'translateX(0)';
-          });
+          const thumbImg = document.createElement('img');
+          thumbImg.src = canvas.toDataURL('image/jpeg', 0.5);
+          const thumbDiv = document.createElement('div');
+          thumbDiv.className = 'thumb-item';
+          thumbDiv.innerHTML = `<span>Trang ${i}</span>`;
+          thumbDiv.prepend(thumbImg);
+
+          thumbDiv.onclick = () => {
+            pageFlipObj.turnToPage(i - 1);
+            document.getElementById('sidebar').classList.remove('active');
+          };
+          thumbContainer.appendChild(thumbDiv);
         }
 
         document.getElementById('loading').style.display = 'none';
         loadingSound.pause();
         loadingSound.currentTime = 0;
-        if (!isMobile) container.style.visibility = 'visible';
+        container.style.visibility = 'visible';
 
         document.getElementById('toolbar').style.display = 'flex';
         document.getElementById('arrow-prev').style.display = 'flex';
         document.getElementById('arrow-next').style.display = 'flex';
+
+        pageFlipObj = new St.PageFlip(container, {
+          width: pageWidth,
+          height: pageHeight,
+          size: "fixed",
+          showCover: true,
+          usePortrait: isMobile,
+          mobileScrollSupport: false,
+          maxShadowOpacity: 0.5,
+          // Đồng bộ hiệu ứng lật 2 chiều trên mobile
+          swipeDistance: isMobile ? 10 : 30,
+          clickEventForward: false,
+        });
+
+        pageFlipObj.loadFromHTML(document.querySelectorAll('.page'));
+
+        // Desktop: offset để canh giữa khi hiển thị 2 trang
+        if (!isMobile) {
+          container.style.transform = 'translateX(-25%)';
+        }
+
+        // Mobile: override touch để 2 chiều lật dùng cùng 1 kiểu hiệu ứng
+        if (isMobile) {
+          let touchStartX = 0;
+          let touchStartY = 0;
+          let isSwiping = false;
+
+          container.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            isSwiping = false;
+          }, { passive: true });
+
+          container.addEventListener('touchmove', (e) => {
+            const dx = Math.abs(e.touches[0].clientX - touchStartX);
+            const dy = Math.abs(e.touches[0].clientY - touchStartY);
+            if (dx > dy && dx > 10) isSwiping = true;
+          }, { passive: true });
+
+          container.addEventListener('touchend', (e) => {
+            if (!isSwiping) return;
+            const dx = e.changedTouches[0].clientX - touchStartX;
+            if (Math.abs(dx) < 40) return;
+            if (dx < 0) {
+              pageFlipObj.flipNext('bottom');
+            } else {
+              pageFlipObj.flipPrev('bottom');
+            }
+          }, { passive: true });
+        }
+
+        pageFlipObj.on('changeState', (e) => {
+          if (e.data === 'flipping' && isSoundEnabled) {
+            flipSound.currentTime = 0;
+            flipSound.play().catch(error => console.log("Chưa tương tác", error));
+          }
+        });
+
+        pageFlipObj.on('flip', (e) => {
+          let currentPage = e.data;
+          document.getElementById('page-input').value = currentPage + 1;
+
+          if (!isMobile) {
+            if (currentPage === 0) {
+              container.style.transform = 'translateX(-25%)';
+            } else if (currentPage === pageFlipObj.getPageCount() - 1 && pageFlipObj.getPageCount() % 2 === 0) {
+              container.style.transform = 'translateX(25%)';
+            } else {
+              container.style.transform = 'translateX(0)';
+            }
+          }
+        });
 
       } catch (error) {
         console.error("Lỗi: ", error);
@@ -379,21 +276,23 @@
     document.getElementById('btn-start').onclick = () => {
       document.getElementById('start-screen').style.display = 'none';
       document.getElementById('loading').style.display = 'flex';
-      if (isSoundEnabled) loadingSound.play();
+
+      if (isSoundEnabled) {
+        loadingSound.play();
+      }
+
       initFlipbook();
     };
 
-    document.getElementById('arrow-prev').onclick = () => isMobile ? mobilePrev() : pageFlipObj.flipPrev();
-    document.getElementById('arrow-next').onclick = () => isMobile ? mobileNext() : pageFlipObj.flipNext();
-    document.getElementById('tb-prev').onclick = () => isMobile ? mobilePrev() : pageFlipObj.flipPrev();
-    document.getElementById('tb-next').onclick = () => isMobile ? mobileNext() : pageFlipObj.flipNext();
+    document.getElementById('arrow-prev').onclick = () => pageFlipObj.flipPrev();
+    document.getElementById('arrow-next').onclick = () => pageFlipObj.flipNext();
+    document.getElementById('tb-prev').onclick = () => pageFlipObj.flipPrev();
+    document.getElementById('tb-next').onclick = () => pageFlipObj.flipNext();
 
     document.getElementById('page-input').addEventListener('change', (e) => {
       let pageNum = parseInt(e.target.value) - 1;
-      if (isMobile) {
-        mobileGoTo(pageNum, pageNum > mobileCurrentPage ? 'next' : 'prev');
-      } else {
-        if (pageNum >= 0 && pageNum < pageFlipObj.getPageCount()) pageFlipObj.turnToPage(pageNum);
+      if (pageNum >= 0 && pageNum < pageFlipObj.getPageCount()) {
+        pageFlipObj.turnToPage(pageNum);
       }
     });
 
@@ -411,21 +310,31 @@
     };
 
     document.getElementById('btn-fullscreen').onclick = () => {
-      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
-      else document.exitFullscreen();
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
     };
 
     const btnSound = document.getElementById('btn-sound');
     const soundIcon = document.getElementById('sound-icon');
     btnSound.onclick = () => {
       isSoundEnabled = !isSoundEnabled;
-      soundIcon.innerText = isSoundEnabled ? 'volume_up' : 'volume_off';
+      if (isSoundEnabled) {
+        soundIcon.innerText = 'volume_up';
+      } else {
+        soundIcon.innerText = 'volume_off';
+      }
     };
 
     document.getElementById('btn-download').onclick = () => {
       const a = document.createElement('a');
-      a.href = pdfUrl; a.download = 'Profile.pdf';
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      a.href = pdfUrl;
+      a.download = 'Profile.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     };
   </script>
 </body>

@@ -473,3 +473,26 @@ canvas {
         transform: translate(100px, 100px) rotate(112deg);
     }
 }
+
+/* ===== MOBILE: Start screen background nhỏ lại ===== */
+@media (max-width: 768px) {
+    #start-screen {
+        background:
+            linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),
+            url('norm-background.png') center/contain no-repeat;
+        background-color: #222;
+        justify-content: flex-end;
+        padding-bottom: 60px;
+    }
+
+    #start-screen h1 {
+        font-size: 20px;
+        text-align: center;
+        padding: 0 20px;
+    }
+
+    #btn-start {
+        font-size: 16px;
+        padding: 12px 30px;
+    }
+}

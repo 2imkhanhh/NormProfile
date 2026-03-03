@@ -29,7 +29,6 @@ canvas {
     height: 100%;
 }
 
-
 .nav-arrow {
     position: fixed;
     top: 50%;
@@ -185,7 +184,8 @@ canvas {
 #start-screen {
     position: fixed;
     inset: 0;
-    background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('norm-background.png') center/cover no-repeat;
+    background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)),
+        url('norm-background.png') center/cover no-repeat;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -218,18 +218,83 @@ canvas {
     transform: scale(1.05);
 }
 
+/* ═══════════════════════════════════════════════════
+   MOBILE VIEWER — hiệu ứng lật sách
+═══════════════════════════════════════════════════ */
+#mobile-viewer {
+    display: none;
+    /* JS bật lên sau khi load */
+    position: fixed;
+    inset: 0;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+}
 
-/* ===== MOBILE STYLES ===== */
+/* Canvas nền — chiếm toàn bộ diện tích trang */
+#mc-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: block;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+}
+
+/* Tờ giấy lật — rộng 50% trang, cao 100% */
+#mc-flap {
+    position: absolute;
+    top: 0;
+    width: 50%;
+    transform-style: preserve-3d;
+    /* perspective đặt ở đây để góc nhìn đúng */
+    perspective: 2000px;
+}
+
+/* Mặt trước & sau của tờ giấy */
+#mc-flap-front,
+#mc-flap-back {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    overflow: hidden;
+}
+
+#mc-flap-front canvas,
+#mc-flap-back canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* Mặt sau xoay sẵn 180° */
+#mc-flap-back {
+    transform: rotateY(180deg);
+}
+
+/* Shadow gradient phủ lên nền khi lật */
+#mc-shadow {
+    position: absolute;
+    top: 0;
+    width: 80px;
+    pointer-events: none;
+    z-index: 4;
+}
+
+/* ═══════════════════════════════════════════════════
+   MOBILE RESPONSIVE
+═══════════════════════════════════════════════════ */
 @media (max-width: 768px) {
 
-    /* Hide zoom buttons on mobile (not very useful) */
     #btn-zoom-in,
     #btn-zoom-out,
     #btn-fullscreen {
         display: none;
     }
 
-    /* Move arrows to edges on mobile */
     #arrow-prev {
         left: 2px;
     }
@@ -238,7 +303,6 @@ canvas {
         right: 2px;
     }
 
-    /* Nav arrows: no background, just icon */
     .nav-arrow {
         background: transparent !important;
         box-shadow: none !important;
@@ -251,22 +315,35 @@ canvas {
         background: transparent !important;
     }
 
-    /* Toolbar adjustments for smaller screens */
     #toolbar {
         gap: 6px;
         padding: 4px 10px;
         bottom: 10px;
     }
 
-    /* Center the book on mobile */
-    #zoom-wrapper {
-        display: flex;
+    #start-screen {
+        background:
+            linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),
+            url('norm-background.png') center/contain no-repeat;
+        background-color: #222;
         justify-content: center;
-        align-items: center;
+    }
+
+    #start-screen h1 {
+        font-size: 20px;
+        text-align: center;
+        padding: 0 20px;
+    }
+
+    #btn-start {
+        font-size: 16px;
+        padding: 12px 30px;
     }
 }
 
-/* ===== PENCIL LOADING ANIMATION ===== */
+/* ═══════════════════════════════════════════════════
+   PENCIL LOADING
+═══════════════════════════════════════════════════ */
 #loading {
     position: fixed;
     z-index: 1000;
@@ -471,28 +548,5 @@ canvas {
     to {
         stroke-dashoffset: 439.82;
         transform: translate(100px, 100px) rotate(112deg);
-    }
-}
-
-/* ===== MOBILE: Start screen background nhỏ lại ===== */
-@media (max-width: 768px) {
-    #start-screen {
-        background:
-            linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),
-            url('norm-background.png') center/contain no-repeat;
-        background-color: #222;
-        justify-content: flex-end;
-        padding-bottom: 60px;
-    }
-
-    #start-screen h1 {
-        font-size: 20px;
-        text-align: center;
-        padding: 0 20px;
-    }
-
-    #btn-start {
-        font-size: 16px;
-        padding: 12px 30px;
     }
 }

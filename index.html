@@ -73,6 +73,19 @@
   <button id="arrow-next" class="nav-arrow" style="display: none;"><span
       class="material-symbols-outlined">chevron_right</span></button>
 
+  <!-- ═══ MOBILE VIEWER (chỉ hiện trên mobile) ═══ -->
+  <div id="mobile-viewer">
+    <!-- Canvas nền: luôn hiển thị trang hiện tại -->
+    <canvas id="mc-bg"></canvas>
+    <!-- Tờ giấy lật (half-width, có 2 mặt) -->
+    <div id="mc-flap">
+      <div id="mc-flap-front"><canvas id="mc-front"></canvas></div>
+      <div id="mc-flap-back"><canvas id="mc-back"></canvas></div>
+    </div>
+    <!-- Shadow gradient khi lật -->
+    <div id="mc-shadow"></div>
+  </div>
+
   <div id="zoom-wrapper">
     <div id="canvas-container"></div>
   </div>
@@ -88,13 +101,11 @@
 
     <button id="btn-sound" title="Bật/Tắt âm thanh"><span class="material-symbols-outlined"
         id="sound-icon">volume_up</span></button>
-
     <button id="btn-thumbs" title="Xem danh sách trang"><span
         class="material-symbols-outlined">grid_view</span></button>
     <button id="btn-zoom-in" title="Phóng to"><span class="material-symbols-outlined">zoom_in</span></button>
     <button id="btn-zoom-out" title="Thu nhỏ"><span class="material-symbols-outlined">zoom_out</span></button>
     <button id="btn-fullscreen" title="Toàn màn hình"><span class="material-symbols-outlined">fullscreen</span></button>
-
     <button id="btn-download" title="Tải xuống PDF"><span class="material-symbols-outlined">download</span></button>
   </div>
 
@@ -115,226 +126,340 @@
     loadingSound.loop = true;
     loadingSound.volume = 0.5;
 
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-    // Detect mobile
     const isMobile = window.innerWidth <= 768;
 
+    // ═══════════════════════════════════════════════════════════
+    //  MOBILE ENGINE — hiệu ứng lật sách thật
+    // ═══════════════════════════════════════════════════════════
+    let mobilePages = [];   // dataURL của từng trang
+    let mobileCur = 0;
+    let mobileFlip = false;
+    let mobileW = 0;
+    let mobileH = 0;
+
+    // Vẽ dataURL lên canvas với đúng kích thước hiển thị
+    function drawTo(canvas, dataUrl) {
+      return new Promise(res => {
+        const img = new Image();
+        img.onload = () => {
+          canvas.width = mobileW;
+          canvas.height = mobileH;
+          canvas.getContext('2d').drawImage(img, 0, 0, mobileW, mobileH);
+          res();
+        };
+        img.src = dataUrl;
+      });
+    }
+
+    async function mobileGoTo(target) {
+      if (mobileFlip) return;
+      if (target < 0 || target >= mobilePages.length || target === mobileCur) return;
+
+      mobileFlip = true;
+      const dir = target > mobileCur ? 'next' : 'prev';
+
+      if (isSoundEnabled) { flipSound.currentTime = 0; flipSound.play().catch(() => { }); }
+
+      const bg = document.getElementById('mc-bg');
+      const flap = document.getElementById('mc-flap');
+      const front = document.getElementById('mc-front');
+      const back = document.getElementById('mc-back');
+      const shade = document.getElementById('mc-shadow');
+
+      // ── 1. Chuẩn bị nội dung ──────────────────────────────
+      // Canvas nền = trang đích (sẽ lộ ra khi tờ lật qua)
+      await drawTo(bg, mobilePages[target]);
+
+      if (dir === 'next') {
+        // Lật sang trái:
+        //   front = nửa PHẢI của trang hiện tại  (phần bị lật đi)
+        //   back  = nửa PHẢI của trang đích       (mặt sau tờ giấy)
+        await drawHalf(front, mobilePages[mobileCur], 'right');
+        await drawHalf(back, mobilePages[target], 'right');
+        // Tờ lật bắt đầu ở bên phải, xoay quanh trục trái của nó
+        flap.style.left = '50%';
+        flap.style.transformOrigin = 'left center';
+        flap.style.transform = 'rotateY(0deg)';
+        shade.style.right = '0';
+        shade.style.left = 'auto';
+        shade.style.background = 'linear-gradient(to left, rgba(0,0,0,0.25), transparent)';
+      } else {
+        // Lật sang phải:
+        //   front = nửa TRÁI của trang hiện tại
+        //   back  = nửa TRÁI của trang đích
+        await drawHalf(front, mobilePages[mobileCur], 'left');
+        await drawHalf(back, mobilePages[target], 'left');
+        flap.style.left = '0';
+        flap.style.transformOrigin = 'right center';
+        flap.style.transform = 'rotateY(0deg)';
+        shade.style.left = '0';
+        shade.style.right = 'auto';
+        shade.style.background = 'linear-gradient(to right, rgba(0,0,0,0.25), transparent)';
+      }
+
+      flap.style.transition = 'none';
+      shade.style.opacity = '0';
+      shade.style.transition = 'none';
+      flap.style.zIndex = '3';
+      shade.style.display = 'block';
+
+      // ── 2. Trigger animation ──────────────────────────────
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        flap.style.transition = 'transform 0.55s cubic-bezier(0.645, 0.045, 0.355, 1)';
+        shade.style.transition = 'opacity 0.55s ease';
+        shade.style.opacity = '1';
+
+        if (dir === 'next') {
+          flap.style.transform = 'rotateY(-180deg)';
+        } else {
+          flap.style.transform = 'rotateY(180deg)';
+        }
+      }));
+
+      // ── 3. Sau khi lật xong ───────────────────────────────
+      setTimeout(async () => {
+        mobileCur = target;
+        document.getElementById('page-input').value = mobileCur + 1;
+
+        // Vẽ trang mới lên canvas nền, ẩn tờ lật
+        await drawTo(bg, mobilePages[mobileCur]);
+        flap.style.transition = 'none';
+        flap.style.transform = 'rotateY(0deg)';
+        flap.style.zIndex = '-1';
+        shade.style.display = 'none';
+
+        mobileFlip = false;
+      }, 580);
+    }
+
+    // Vẽ nửa trái hoặc nửa phải của 1 trang lên canvas (half-width)
+    function drawHalf(canvas, dataUrl, side) {
+      return new Promise(res => {
+        const img = new Image();
+        img.onload = () => {
+          const hw = Math.ceil(mobileW / 2);
+          canvas.width = hw;
+          canvas.height = mobileH;
+          const ctx = canvas.getContext('2d');
+          if (side === 'right') {
+            // Crop nửa phải của ảnh gốc
+            ctx.drawImage(img,
+              mobileW / 2, 0, mobileW / 2, mobileH,  // src: từ giữa sang phải
+              0, 0, hw, mobileH                         // dst: toàn canvas
+            );
+          } else {
+            // Crop nửa trái
+            ctx.drawImage(img,
+              0, 0, mobileW / 2, mobileH,
+              0, 0, hw, mobileH
+            );
+          }
+          res();
+        };
+        img.src = dataUrl;
+      });
+    }
+
+    function mobilePrev() { mobileGoTo(mobileCur - 1); }
+    function mobileNext() { mobileGoTo(mobileCur + 1); }
+
+    // ═══════════════════════════════════════════════════════════
+    //  INIT
+    // ═══════════════════════════════════════════════════════════
     async function initFlipbook() {
       try {
         const pdf = await pdfjsLib.getDocument(pdfUrl).promise;
         const numPages = pdf.numPages;
         document.getElementById('total-pages').innerText = numPages;
 
-        // Tính kích thước trang
         const firstPage = await pdf.getPage(1);
-        const baseViewport = firstPage.getViewport({ scale: 1 });
-        const pageAspect = baseViewport.height / baseViewport.width; // height/width ratio
-
-        let pageWidth, pageHeight, renderScale;
-
+        const baseVP = firstPage.getViewport({ scale: 1 });
+        const pageAspect = baseVP.height / baseVP.width;
         const dpr = window.devicePixelRatio || 1;
 
         if (isMobile) {
-          // Mobile: 1 trang full màn hình, trừ chỗ cho arrows
-          pageWidth = Math.floor(window.innerWidth * 0.92);
-          pageHeight = Math.floor(pageWidth * pageAspect);
-          // Nhân dpr để render độ phân giải cao → chữ sắc nét
-          renderScale = (pageWidth / baseViewport.width) * dpr;
-        } else {
-          pageWidth = 450;
-          pageHeight = 636;
-          renderScale = 1.5;
-        }
+          // ── MOBILE path ──────────────────────────────────
+          mobileW = Math.floor(window.innerWidth * 0.92);
+          mobileH = Math.floor(mobileW * pageAspect);
+          const renderScale = (mobileW / baseVP.width) * dpr;
 
-        for (let i = 1; i <= numPages; i++) {
-          const page = await pdf.getPage(i);
-          const viewport = page.getViewport({ scale: renderScale });
+          // Size mobile viewer elements
+          const viewer = document.getElementById('mobile-viewer');
+          const bg = document.getElementById('mc-bg');
+          const flap = document.getElementById('mc-flap');
+          const front = document.getElementById('mc-front');
+          const back = document.getElementById('mc-back');
+          const shade = document.getElementById('mc-shadow');
 
-          const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          // Canvas pixel thực tế = kích thước cao * dpr
-          canvas.height = viewport.height;
-          canvas.width = viewport.width;
+          viewer.style.width = mobileW + 'px';
+          viewer.style.height = mobileH + 'px';
+          bg.style.width = mobileW + 'px';
+          bg.style.height = mobileH + 'px';
+          flap.style.height = mobileH + 'px';
+          shade.style.height = mobileH + 'px';
+          shade.style.width = (mobileW / 2) + 'px';
 
-          const pageDiv = document.createElement('div');
-          pageDiv.className = 'page';
-          if (isMobile) {
-            pageDiv.style.width = pageWidth + 'px';
-            pageDiv.style.height = pageHeight + 'px';
-            // CSS size hiển thị đúng kích thước thực (không nhân dpr)
-            canvas.style.width = pageWidth + 'px';
-            canvas.style.height = pageHeight + 'px';
+          // Render tất cả trang
+          for (let i = 1; i <= numPages; i++) {
+            const page = await pdf.getPage(i);
+            const vp = page.getViewport({ scale: renderScale });
+            const off = document.createElement('canvas');
+            off.width = vp.width;
+            off.height = vp.height;
+            await page.render({ canvasContext: off.getContext('2d'), viewport: vp }).promise;
+            mobilePages.push(off.toDataURL('image/jpeg', 0.92));
+
+            // Thumbnail
+            const thumbImg = document.createElement('img');
+            thumbImg.src = off.toDataURL('image/jpeg', 0.5);
+            const thumbDiv = document.createElement('div');
+            thumbDiv.className = 'thumb-item';
+            thumbDiv.innerHTML = `<span>Trang ${i}</span>`;
+            thumbDiv.prepend(thumbImg);
+            const idx = i - 1;
+            thumbDiv.onclick = () => {
+              mobileGoTo(idx);
+              document.getElementById('sidebar').classList.remove('active');
+            };
+            thumbContainer.appendChild(thumbDiv);
           }
-          pageDiv.appendChild(canvas);
-          container.appendChild(pageDiv);
 
-          await page.render({ canvasContext: context, viewport: viewport }).promise;
+          // Vẽ trang đầu lên bg
+          await drawTo(bg, mobilePages[0]);
+          flap.style.zIndex = '-1';
+          shade.style.display = 'none';
+          viewer.style.display = 'flex';
 
-          const thumbImg = document.createElement('img');
-          thumbImg.src = canvas.toDataURL('image/jpeg', 0.5);
-          const thumbDiv = document.createElement('div');
-          thumbDiv.className = 'thumb-item';
-          thumbDiv.innerHTML = `<span>Trang ${i}</span>`;
-          thumbDiv.prepend(thumbImg);
+          // Touch swipe
+          let tx = 0, ty = 0, sw = false;
+          viewer.addEventListener('touchstart', e => {
+            tx = e.touches[0].clientX; ty = e.touches[0].clientY; sw = false;
+          }, { passive: true });
+          viewer.addEventListener('touchmove', e => {
+            const dx = Math.abs(e.touches[0].clientX - tx);
+            const dy = Math.abs(e.touches[0].clientY - ty);
+            if (dx > dy && dx > 10) sw = true;
+          }, { passive: true });
+          viewer.addEventListener('touchend', e => {
+            if (!sw) return;
+            const dx = e.changedTouches[0].clientX - tx;
+            if (Math.abs(dx) < 40) return;
+            dx < 0 ? mobileNext() : mobilePrev();
+          }, { passive: true });
 
-          thumbDiv.onclick = () => {
-            pageFlipObj.turnToPage(i - 1);
-            document.getElementById('sidebar').classList.remove('active');
-          };
-          thumbContainer.appendChild(thumbDiv);
+        } else {
+          // ── DESKTOP path (PageFlip, giữ nguyên) ──────────
+          const pageWidth = 450, pageHeight = 636, renderScale = 1.5;
+
+          for (let i = 1; i <= numPages; i++) {
+            const page = await pdf.getPage(i);
+            const viewport = page.getViewport({ scale: renderScale });
+            const canvas = document.createElement('canvas');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+            const pageDiv = document.createElement('div');
+            pageDiv.className = 'page';
+            pageDiv.appendChild(canvas);
+            container.appendChild(pageDiv);
+
+            const thumbImg = document.createElement('img');
+            thumbImg.src = canvas.toDataURL('image/jpeg', 0.5);
+            const thumbDiv = document.createElement('div');
+            thumbDiv.className = 'thumb-item';
+            thumbDiv.innerHTML = `<span>Trang ${i}</span>`;
+            thumbDiv.prepend(thumbImg);
+            thumbDiv.onclick = () => {
+              pageFlipObj.turnToPage(i - 1);
+              document.getElementById('sidebar').classList.remove('active');
+            };
+            thumbContainer.appendChild(thumbDiv);
+          }
+
+          pageFlipObj = new St.PageFlip(container, {
+            width: pageWidth, height: pageHeight,
+            size: 'fixed', showCover: true,
+            usePortrait: false, mobileScrollSupport: false,
+            maxShadowOpacity: 0.5,
+          });
+          pageFlipObj.loadFromHTML(document.querySelectorAll('.page'));
+          container.style.transform = 'translateX(-25%)';
+          container.style.visibility = 'visible';
+
+          pageFlipObj.on('changeState', e => {
+            if (e.data === 'flipping' && isSoundEnabled) {
+              flipSound.currentTime = 0; flipSound.play().catch(() => { });
+            }
+          });
+          pageFlipObj.on('flip', e => {
+            const cp = e.data;
+            document.getElementById('page-input').value = cp + 1;
+            if (cp === 0) container.style.transform = 'translateX(-25%)';
+            else if (cp === pageFlipObj.getPageCount() - 1 && pageFlipObj.getPageCount() % 2 === 0)
+              container.style.transform = 'translateX(25%)';
+            else container.style.transform = 'translateX(0)';
+          });
         }
 
         document.getElementById('loading').style.display = 'none';
         loadingSound.pause();
         loadingSound.currentTime = 0;
-        container.style.visibility = 'visible';
-
         document.getElementById('toolbar').style.display = 'flex';
         document.getElementById('arrow-prev').style.display = 'flex';
         document.getElementById('arrow-next').style.display = 'flex';
 
-        pageFlipObj = new St.PageFlip(container, {
-          width: pageWidth,
-          height: pageHeight,
-          size: "fixed",
-          showCover: true,
-          usePortrait: isMobile,
-          mobileScrollSupport: false,
-          maxShadowOpacity: 0.5,
-          // Đồng bộ hiệu ứng lật 2 chiều trên mobile
-          swipeDistance: isMobile ? 10 : 30,
-          clickEventForward: false,
-        });
-
-        pageFlipObj.loadFromHTML(document.querySelectorAll('.page'));
-
-        // Desktop: offset để canh giữa khi hiển thị 2 trang
-        if (!isMobile) {
-          container.style.transform = 'translateX(-25%)';
-        }
-
-        // Mobile: override touch để 2 chiều lật dùng cùng 1 kiểu hiệu ứng
-        if (isMobile) {
-          let touchStartX = 0;
-          let touchStartY = 0;
-          let isSwiping = false;
-
-          container.addEventListener('touchstart', (e) => {
-            touchStartX = e.touches[0].clientX;
-            touchStartY = e.touches[0].clientY;
-            isSwiping = false;
-          }, { passive: true });
-
-          container.addEventListener('touchmove', (e) => {
-            const dx = Math.abs(e.touches[0].clientX - touchStartX);
-            const dy = Math.abs(e.touches[0].clientY - touchStartY);
-            if (dx > dy && dx > 10) isSwiping = true;
-          }, { passive: true });
-
-          container.addEventListener('touchend', (e) => {
-            if (!isSwiping) return;
-            const dx = e.changedTouches[0].clientX - touchStartX;
-            if (Math.abs(dx) < 40) return;
-            if (dx < 0) {
-              pageFlipObj.flipNext('bottom');
-            } else {
-              pageFlipObj.flipPrev('bottom');
-            }
-          }, { passive: true });
-        }
-
-        pageFlipObj.on('changeState', (e) => {
-          if (e.data === 'flipping' && isSoundEnabled) {
-            flipSound.currentTime = 0;
-            flipSound.play().catch(error => console.log("Chưa tương tác", error));
-          }
-        });
-
-        pageFlipObj.on('flip', (e) => {
-          let currentPage = e.data;
-          document.getElementById('page-input').value = currentPage + 1;
-
-          if (!isMobile) {
-            if (currentPage === 0) {
-              container.style.transform = 'translateX(-25%)';
-            } else if (currentPage === pageFlipObj.getPageCount() - 1 && pageFlipObj.getPageCount() % 2 === 0) {
-              container.style.transform = 'translateX(25%)';
-            } else {
-              container.style.transform = 'translateX(0)';
-            }
-          }
-        });
-
-      } catch (error) {
-        console.error("Lỗi: ", error);
-        document.getElementById('loading').innerText = "Không thể tải PDF!";
+      } catch (err) {
+        console.error(err);
+        document.getElementById('loading').innerText = 'Không thể tải PDF!';
         loadingSound.pause();
       }
     }
 
+    // ── Buttons ────────────────────────────────────────────────
     document.getElementById('btn-start').onclick = () => {
       document.getElementById('start-screen').style.display = 'none';
       document.getElementById('loading').style.display = 'flex';
-
-      if (isSoundEnabled) {
-        loadingSound.play();
-      }
-
+      if (isSoundEnabled) loadingSound.play();
       initFlipbook();
     };
 
-    document.getElementById('arrow-prev').onclick = () => pageFlipObj.flipPrev();
-    document.getElementById('arrow-next').onclick = () => pageFlipObj.flipNext();
-    document.getElementById('tb-prev').onclick = () => pageFlipObj.flipPrev();
-    document.getElementById('tb-next').onclick = () => pageFlipObj.flipNext();
+    document.getElementById('arrow-prev').onclick = () => isMobile ? mobilePrev() : pageFlipObj.flipPrev();
+    document.getElementById('arrow-next').onclick = () => isMobile ? mobileNext() : pageFlipObj.flipNext();
+    document.getElementById('tb-prev').onclick = () => isMobile ? mobilePrev() : pageFlipObj.flipPrev();
+    document.getElementById('tb-next').onclick = () => isMobile ? mobileNext() : pageFlipObj.flipNext();
 
-    document.getElementById('page-input').addEventListener('change', (e) => {
-      let pageNum = parseInt(e.target.value) - 1;
-      if (pageNum >= 0 && pageNum < pageFlipObj.getPageCount()) {
-        pageFlipObj.turnToPage(pageNum);
-      }
+    document.getElementById('page-input').addEventListener('change', e => {
+      const n = parseInt(e.target.value) - 1;
+      if (isMobile) mobileGoTo(n);
+      else if (n >= 0 && n < pageFlipObj.getPageCount()) pageFlipObj.turnToPage(n);
     });
 
     document.getElementById('btn-thumbs').onclick = () => document.getElementById('sidebar').classList.add('active');
     document.getElementById('close-sidebar').onclick = () => document.getElementById('sidebar').classList.remove('active');
 
     let currentZoom = 1;
-    document.getElementById('btn-zoom-in').onclick = () => {
-      currentZoom += 0.2;
-      document.getElementById('zoom-wrapper').style.transform = `scale(${currentZoom})`;
-    };
-    document.getElementById('btn-zoom-out').onclick = () => {
-      currentZoom = Math.max(0.5, currentZoom - 0.2);
-      document.getElementById('zoom-wrapper').style.transform = `scale(${currentZoom})`;
-    };
+    document.getElementById('btn-zoom-in').onclick = () => { currentZoom += 0.2; document.getElementById('zoom-wrapper').style.transform = `scale(${currentZoom})`; };
+    document.getElementById('btn-zoom-out').onclick = () => { currentZoom = Math.max(0.5, currentZoom - 0.2); document.getElementById('zoom-wrapper').style.transform = `scale(${currentZoom})`; };
 
     document.getElementById('btn-fullscreen').onclick = () => {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen();
-      } else {
-        document.exitFullscreen();
-      }
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
     };
 
-    const btnSound = document.getElementById('btn-sound');
     const soundIcon = document.getElementById('sound-icon');
-    btnSound.onclick = () => {
+    document.getElementById('btn-sound').onclick = () => {
       isSoundEnabled = !isSoundEnabled;
-      if (isSoundEnabled) {
-        soundIcon.innerText = 'volume_up';
-      } else {
-        soundIcon.innerText = 'volume_off';
-      }
+      soundIcon.innerText = isSoundEnabled ? 'volume_up' : 'volume_off';
     };
 
     document.getElementById('btn-download').onclick = () => {
       const a = document.createElement('a');
-      a.href = pdfUrl;
-      a.download = 'Profile.pdf';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      a.href = pdfUrl; a.download = 'Profile.pdf';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
     };
   </script>
 </body>
